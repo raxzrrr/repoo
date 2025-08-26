@@ -1,0 +1,10 @@
+project_id = "ygcdksdsleyazlxfjpid"
+
+[functions.razorpay-payment]
+verify_jwt = false
+
+[functions.voice-to-text]
+verify_jwt = false
+
+[functions.real-job-search]
+verify_jwt = false
