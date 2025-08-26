@@ -11,33 +11,27 @@ import {
   BookOpen, 
   Award, 
   FileText, 
-  TrendingUp,
+  RefreshCw,
   Zap,
-  Clock,
-  BarChart3
+  Video
 } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useInterviewUsage } from '@/hooks/useInterviewUsage';
-import { useLocalDashboardData } from '@/hooks/useLocalDashboardData';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { hasProPlan } = useSubscription();
   const { canUseFreeInterview, usage } = useInterviewUsage();
-  const { 
+  const {
     totalInterviews,
-    completedInterviews,
-    averageScore,
     currentStreak,
+    averageScore,
     certificatesEarned,
-    totalCourses,
-    completedCourses,
-    averageProgress,
-    weeklyProgress,
-    skillsBreakdown,
     loading,
-    error
-  } = useLocalDashboardData();
+    error,
+    refreshStats
+  } = useDashboardStats();
   
   const isPro = hasProPlan();
   const canStartInterview = isPro || canUseFreeInterview();
@@ -116,34 +110,74 @@ const Dashboard: React.FC = () => {
             </CardHeader>
             <CardContent>
               <CardTitle className="text-lg mb-2">Certificates</CardTitle>
+              <div className="text-2xl font-bold text-green-600 mb-1">{certificatesEarned}</div>
               <CardDescription>
-                View your earned certificates and achievements
+                {certificatesEarned === 0 ? 'Complete assessments to earn certificates' : 'View your earned achievements'}
               </CardDescription>
             </CardContent>
           </Card>
         </div>
 
-        {/* Analytics Dashboard */}
-        <div>
-          <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-xl font-semibold">Your Progress</h2>
-          </div>
-          <DashboardAnalytics 
-            // All data from local storage
-            totalInterviews={totalInterviews}
-            completedInterviews={completedInterviews}
-            averageScore={averageScore}
-            currentStreak={currentStreak}
-            weeklyProgress={weeklyProgress}
-            skillsBreakdown={skillsBreakdown}
-            certificatesEarned={certificatesEarned}
-            totalCourses={totalCourses}
-            completedCourses={completedCourses}
-            averageProgress={averageProgress}
-            loading={loading}
-            error={error}
-          />
+        {/* Real-time Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Total Interviews</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? '...' : totalInterviews}</div>
+              <p className="text-xs text-muted-foreground">Practice sessions completed</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? '...' : currentStreak} days</div>
+              <p className="text-xs text-muted-foreground">
+                {currentStreak > 0 ? '🔥 Keep it up!' : 'Start your streak today!'}
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? '...' : averageScore}%</div>
+              <p className="text-xs text-muted-foreground">
+                {averageScore >= 80 ? 'Excellent!' : averageScore >= 70 ? 'Good progress' : 'Keep practicing'}
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Certificates Earned</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? '...' : certificatesEarned}</div>
+              <p className="text-xs text-muted-foreground">
+                {certificatesEarned === 0 ? 'Complete courses to earn' : 'Well done!'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Refresh Button */}
+        <div className="flex justify-center">
+          <Button 
+            onClick={refreshStats} 
+            variant="outline" 
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </Button>
         </div>
 
         {/* Quick Tips */}
@@ -165,13 +199,13 @@ const Dashboard: React.FC = () => {
                   <p className="font-medium text-green-900">Review feedback</p>
                   <p className="text-sm text-green-700">Learn from AI suggestions to improve faster</p>
                 </div>
-                <div className="p-3 bg-purple-50 rounded-lg border-l-4 border-purple-500">
+            Interviews: {totalInterviews}
                   <p className="font-medium text-purple-900">Stay confident</p>
                   <p className="text-sm text-purple-700">Confidence is key to interview success</p>
-                </div>
-              </div>
+            <Award className="w-3 h-3 mr-1" />
+            Certificates: {certificatesEarned}
             </CardContent>
-          </Card>
+          <span className="text-xs text-gray-500">Streak: {currentStreak} days</span>
         </div>
       </div>
     </DashboardLayout>

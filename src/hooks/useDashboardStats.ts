@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/ClerkAuthContext';
+import { generateConsistentUUID } from '@/utils/userUtils';
 
 interface DashboardStats {
   totalInterviews: number;
@@ -32,7 +33,7 @@ interface DashboardStats {
 }
 
 export const useDashboardStats = () => {
-  const { user } = useAuth();
+  const { user, getSupabaseUserId, ensureSupabaseSession } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalInterviews: 0,
     currentStreak: 0,
@@ -46,9 +47,22 @@ export const useDashboardStats = () => {
   });
 
   const fetchStats = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setStats(prev => ({ ...prev, loading: false }));
+      return;
+    }
 
     try {
+      // Ensure Supabase session is active before querying RLS-protected tables
+      await ensureSupabaseSession();
+      
+      const supabaseUserId = getSupabaseUserId();
+      if (!supabaseUserId) {
+        console.log('No Supabase user ID available');
+        setStats(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
       setStats(prev => ({ ...prev, loading: true, error: null }));
 
       // Fetch all data in parallel for better performance
@@ -56,26 +70,26 @@ export const useDashboardStats = () => {
         supabase
           .from('interview_sessions')
           .select('id, interview_type, overall_score, created_at, session_status')
-          .eq('user_id', user.id)
+          .eq('user_id', supabaseUserId)
           .order('created_at', { ascending: false }),
         
         supabase
           .from('user_certificates')
           .select('id, created_at, course_id')
-          .eq('user_id', user.id)
+          .eq('user_id', supabaseUserId)
           .order('created_at', { ascending: false }),
         
         supabase
           .from('user_learning')
           .select('id, is_completed, updated_at, course_id')
-          .eq('user_id', user.id)
+          .eq('user_id', supabaseUserId)
           .eq('is_completed', true)
           .order('updated_at', { ascending: false }),
         
         supabase
           .from('user_interview_usage')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', supabaseUserId)
           .single()
       ]);
 
@@ -98,7 +112,7 @@ export const useDashboardStats = () => {
 
       // Debug logging
       console.log('Dashboard Stats Debug:', {
-        userId: user.id,
+        userId: supabaseUserId,
         interviewsCount: interviews.length,
         certificatesCount: certificates.length,
         learningDataCount: learningData.length,
@@ -241,11 +255,12 @@ export const useDashboardStats = () => {
         error: error.message || 'Failed to fetch dashboard data',
       }));
     }
-  }, [user?.id]);
+  }, [user?.id, getSupabaseUserId, ensureSupabaseSession]);
 
   // Set up real-time subscriptions
   useEffect(() => {
-    if (!user?.id) return;
+    const supabaseUserId = getSupabaseUserId();
+    if (!user?.id || !supabaseUserId) return;
 
     fetchStats();
 
@@ -255,28 +270,28 @@ export const useDashboardStats = () => {
         .channel('interviews-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'interview_sessions', filter: `user_id=eq.${user.id}` },
+          { event: '*', schema: 'public', table: 'interview_sessions', filter: `user_id=eq.${supabaseUserId}` },
           () => fetchStats()
         ),
       supabase
         .channel('certificates-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'user_certificates', filter: `user_id=eq.${user.id}` },
+          { event: '*', schema: 'public', table: 'user_certificates', filter: `user_id=eq.${supabaseUserId}` },
           () => fetchStats()
         ),
       supabase
         .channel('learning-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'user_learning', filter: `user_id=eq.${user.id}` },
+          { event: '*', schema: 'public', table: 'user_learning', filter: `user_id=eq.${supabaseUserId}` },
           () => fetchStats()
         ),
       supabase
         .channel('usage-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'user_interview_usage', filter: `user_id=eq.${user.id}` },
+          { event: '*', schema: 'public', table: 'user_interview_usage', filter: `user_id=eq.${supabaseUserId}` },
           () => fetchStats()
         ),
     ];
@@ -288,15 +303,16 @@ export const useDashboardStats = () => {
     return () => {
       channels.forEach(channel => supabase.removeChannel(channel));
     };
-  }, [user?.id, fetchStats]);
+  }, [user?.id, getSupabaseUserId, fetchStats]);
 
   // Auto-refresh every 30 seconds for additional real-time feel
   useEffect(() => {
-    if (!user?.id) return;
+    const supabaseUserId = getSupabaseUserId();
+    if (!user?.id || !supabaseUserId) return;
 
     const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
-  }, [user?.id, fetchStats]);
+  }, [user?.id, getSupabaseUserId, fetchStats]);
 
   return {
     ...stats,

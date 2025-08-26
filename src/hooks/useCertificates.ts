@@ -52,7 +52,7 @@ export const useCertificates = () => {
 
       try {
         // Ensure Supabase session is established before querying RLS-protected tables
-        await ensureSupabaseSession();
+        await ensureSupabaseSession?.();
         
         const supabaseUserId = getSupabaseUserId();
         if (!supabaseUserId) {
@@ -114,17 +114,38 @@ export const useCertificates = () => {
 
     fetchCertificates();
 
-    // Listen for auth state changes to refetch when session is ready
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' || (event === 'TOKEN_REFRESHED' && session)) {
-        console.log('useCertificates - Auth state changed, refetching certificates');
-        fetchCertificates();
-      }
-    });
+    // Set up real-time subscriptions for certificate changes
+    const supabaseUserId = getSupabaseUserId();
+    if (supabaseUserId) {
+      const channel = supabase
+        .channel('user-certificates-changes')
+        .on(
+          'postgres_changes',
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'user_certificates',
+            filter: `user_id=eq.${supabaseUserId}`
+          },
+          (payload) => {
+            console.log('Certificate change detected:', payload);
+            fetchCertificates();
+          }
+        )
+        .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
+      // Listen for custom certificate generation events
+      const handleCertificateGenerated = () => {
+        console.log('Certificate generation event received, refetching...');
+        setTimeout(fetchCertificates, 500);
+      };
+      
+      window.addEventListener('certificateGenerated', handleCertificateGenerated);
+      return () => {
+        supabase.removeChannel(channel);
+        window.removeEventListener('certificateGenerated', handleCertificateGenerated);
+      };
+    }
   }, [getSupabaseUserId, isAuthenticated, ensureSupabaseSession]);
 
   const refetch = () => {

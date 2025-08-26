@@ -10,22 +10,22 @@ import CertificateViewer from '@/components/Certificates/CertificateViewer';
 import { Award, Download, Eye, Calendar, CheckCircle, Clock, RefreshCw, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/ClerkAuthContext';
 import { downloadCertificate } from '@/services/certificateService';
-import { useLocalDashboardData } from '@/hooks/useLocalDashboardData';
+import { useCertificates } from '@/hooks/useCertificates';
 
 const CertificatesPage: React.FC = () => {
   const { user } = useAuth();
   const [selectedCertificate, setSelectedCertificate] = useState<any | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
 
-  const { certificates: userCertificates, loading, error } = useLocalDashboardData();
+  const { userCertificates, loading, refetch } = useCertificates();
 
   const handleDownload = (certificate: any) => { // Changed to any
     const userName = user?.fullName || user?.firstName || 'Student';
     downloadCertificate({
       userName,
-      certificateTitle: certificate.certificate_title || 'Certificate',
-      completionDate: new Date(certificate.issued_date).toLocaleDateString(),
-      score: certificate.assessment_score,
+      certificateTitle: certificate.certificate_title || certificate.certificateTitle || 'Certificate',
+      completionDate: new Date(certificate.issued_date || certificate.issuedDate).toLocaleDateString(),
+      score: certificate.score || certificate.assessment_score || certificate.assessmentScore,
       verificationCode: certificate.verification_code
     });
   };
@@ -45,23 +45,6 @@ const CertificatesPage: React.FC = () => {
     );
   }
 
-  if (error) {
-    return (
-      <DashboardLayout>
-        <div className="flex justify-center items-center py-12">
-          <div className="text-center">
-            <Award className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">Error Loading Certificates</h3>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()} variant="outline">
-              Try Again
-            </Button>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -76,7 +59,7 @@ const CertificatesPage: React.FC = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => window.location.reload()}
+              onClick={refetch}
               className="flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
@@ -203,16 +186,16 @@ const CertificatesPage: React.FC = () => {
                       >
                         Available
                       </Badge>
-                    </div>
+                      <span>{new Date(cert.issued_date || cert.issuedDate).toLocaleDateString()}</span>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <h3 className="font-semibold text-lg mb-2">No available certificates currently</h3>
+                    {(cert.score || cert.assessmentScore) && (
+                    {cert.certificate_title || cert.certificateTitle}
+                        {cert.score || cert.assessmentScore}%
                   <p className="text-sm text-muted-foreground mb-3">
-                    Complete courses and assessments to unlock new certificates.
+                    {cert.certificate_description || cert.certificateDescription}
                   </p>
                   <Button onClick={() => window.location.href = '/learning'}>
-                    Start Learning
+                    ID: {cert.verification_code || cert.verificationCode}
                   </Button>
                 </CardContent>
               </Card>
@@ -225,10 +208,10 @@ const CertificatesPage: React.FC = () => {
       {viewerOpen && selectedCertificate && (
         <CertificateViewer
           certificate={{
-            id: selectedCertificate.verification_code,
-            title: selectedCertificate.certificateTitle || 'Certificate',
-            completedDate: new Date(selectedCertificate.issuedDate).toLocaleDateString(),
-            score: selectedCertificate.assessmentScore || 0
+            id: selectedCertificate.verification_code || selectedCertificate.verificationCode,
+            title: selectedCertificate.certificate_title || selectedCertificate.certificateTitle || 'Certificate',
+            completedDate: new Date(selectedCertificate.issued_date || selectedCertificate.issuedDate).toLocaleDateString(),
+            score: selectedCertificate.score || selectedCertificate.assessment_score || selectedCertificate.assessmentScore || 0
           }}
           userName={user?.fullName || user?.firstName || 'Student'}
           onClose={() => setViewerOpen(false)}

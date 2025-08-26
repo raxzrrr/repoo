@@ -118,6 +118,17 @@ const SimpleAssessment: React.FC<SimpleAssessmentProps> = ({
       setResults(result);
       setShowResults(true);
       
+      // If user passed, trigger a refresh of certificates data
+      if (result.passed) {
+        // Trigger certificate refresh after a short delay to allow database to update
+        setTimeout(() => {
+          // Dispatch a custom event that the certificates hook can listen to
+          window.dispatchEvent(new CustomEvent('certificateGenerated', {
+            detail: { courseId, courseName, score: result.score }
+          }));
+        }, 1000);
+      }
+      
       toast({
         title: 'Assessment Submitted',
         description: `You scored ${result.score}%! ${result.passed ? 'Congratulations!' : 'Keep practicing!'}`
