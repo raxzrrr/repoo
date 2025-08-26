@@ -1,5 +1,3 @@
-
-import { supabase } from '@/integrations/supabase/client';
 import { generateConsistentUUID } from '@/utils/userUtils';
 
 export interface UserLearningData {
@@ -25,48 +23,27 @@ export const learningService = {
     try {
       const userId = generateConsistentUUID(clerkUserId);
       
-      const { data, error } = await supabase
-        .from('user_learning')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('course_id', courseId)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching learning data:', error);
-        throw error;
-      }
-
-      if (!data) {
-        // Create new record if it doesn't exist
-        const newRecord = {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/learning-service`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'fetch',
           user_id: userId,
           course_id: courseId,
-          progress: {},
-          completed_modules_count: 0,
-          total_modules_count: totalModules,
-          last_assessment_score: 0,
-          is_completed: false,
-          assessment_attempted: false,
-          assessment_passed: false,
-          assessment_score: null,
-          assessment_completed_at: null
-        };
+          total_modules: totalModules
+        })
+      });
 
-        const { data: createdData, error: createError } = await supabase
-          .from('user_learning')
-          .insert([newRecord])
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating learning record:', createError);
-          throw createError;
-        }
-
-        return createdData as UserLearningData;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error fetching learning data:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-      
+
+      const data = await response.json();
       return data as UserLearningData;
     } catch (error) {
       console.error('Error in fetchUserLearningData:', error);
@@ -84,50 +61,29 @@ export const learningService = {
     try {
       const userId = generateConsistentUUID(clerkUserId);
       
-      const updateData = {
-        progress: courseProgress,
-        completed_modules_count: completedModulesCount,
-        total_modules_count: totalModules,
-        updated_at: new Date().toISOString()
-      };
-
-      // Try to update existing record
-      const { data, error } = await supabase
-        .from('user_learning')
-        .update(updateData)
-        .eq('user_id', userId)
-        .eq('course_id', courseId)
-        .select()
-        .maybeSingle();
-
-      if (error || !data) {
-        // If no record exists, create one
-        const newRecord = {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/learning-service`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'updateProgress',
           user_id: userId,
           course_id: courseId,
-          ...updateData,
-          last_assessment_score: 0,
-          is_completed: false,
-          assessment_attempted: false,
-          assessment_passed: false,
-          assessment_score: null,
-          assessment_completed_at: null
-        };
+          progress: courseProgress,
+          completed_modules_count: completedModulesCount,
+          total_modules: totalModules
+        })
+      });
 
-        const { data: createdData, error: createError } = await supabase
-          .from('user_learning')
-          .insert([newRecord])
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating learning record:', createError);
-          throw createError;
-        }
-
-        return createdData as UserLearningData;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating module progress:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-      
+
+      const data = await response.json();
       return data as UserLearningData;
     } catch (error) {
       console.error('Error updating module progress:', error);
@@ -138,52 +94,28 @@ export const learningService = {
   async updateAssessmentScore(clerkUserId: string, courseId: string, score: number): Promise<UserLearningData> {
     try {
       const userId = generateConsistentUUID(clerkUserId);
-      const passed = score >= 70;
       
-      const updateData = {
-        assessment_attempted: true,
-        assessment_passed: passed,
-        assessment_score: score,
-        assessment_completed_at: passed ? new Date().toISOString() : null,
-        is_completed: passed, // Mark course as completed if assessment passed
-        last_assessment_score: score,
-        updated_at: new Date().toISOString()
-      };
-
-      // Try to update existing record
-      const { data, error } = await supabase
-        .from('user_learning')
-        .update(updateData)
-        .eq('user_id', userId)
-        .eq('course_id', courseId)
-        .select()
-        .maybeSingle();
-
-      if (error || !data) {
-        // If no record exists, create one
-        const newRecord = {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/learning-service`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'updateAssessment',
           user_id: userId,
           course_id: courseId,
-          progress: {},
-          completed_modules_count: 0,
-          total_modules_count: 0,
-          ...updateData
-        };
+          score: score
+        })
+      });
 
-        const { data: createdData, error: createError } = await supabase
-          .from('user_learning')
-          .insert([newRecord])
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating learning record:', createError);
-          throw createError;
-        }
-
-        return createdData as UserLearningData;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating assessment score:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-      
+
+      const data = await response.json();
       return data as UserLearningData;
     } catch (error) {
       console.error('Error updating assessment score:', error);
